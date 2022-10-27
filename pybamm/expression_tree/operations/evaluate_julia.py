@@ -319,11 +319,19 @@ class JuliaConverter(object):
             my_id = symbol.id
             self._intermediate[my_id] = JuliaTime(my_id)
         elif isinstance(symbol, pybamm.PsuedoInputParameter):
-            my_id = self._convert_tree_to_intermediate(symbol.children[0])
+            if not self._black_box:
+                my_id = self._convert_tree_to_intermediate(symbol.children[0])
+            else:
+                name = symbol.name
+                self.inputs.append(name)
+                my_id = symbol.id
+                self._intermediate[my_id] = JuliaInput(my_id, name)
         elif isinstance(symbol, pybamm.InputParameter):
             my_id = symbol.id
             name = symbol.name
             self._intermediate[my_id] = JuliaInput(my_id, name)
+            if self._black_box and "p" not in self.inputs:
+                self.inputs.append("p")
         elif isinstance(symbol, pybamm.StateVector):
             my_id = symbol.id
             first_point = symbol.first_point
@@ -331,6 +339,8 @@ class JuliaConverter(object):
             points = (first_point, last_point)
             shape = symbol.shape
             self._intermediate[my_id] = JuliaStateVector(my_id, points, shape)
+            if self._black_box and "y" not in self.inputs:
+                self.inputs.append("y")
         elif isinstance(symbol, pybamm.StateVectorDot):
             my_id = symbol.id
             first_point = symbol.first_point
@@ -338,6 +348,8 @@ class JuliaConverter(object):
             points = (first_point, last_point)
             shape = symbol.shape
             self._intermediate[my_id] = JuliaStateVectorDot(my_id, points, shape)
+            if self._black_box and "dy" not in self.inputs:
+                self.inputs.append("dy")
         else:
             raise NotImplementedError(
                 "Conversion to Julia not implemented for a symbol of type '{}'".format(
@@ -684,7 +696,7 @@ class JuliaJuliaFunction(object):
         input_var_names = []
         for input in self.inputs:
             input_var_names.append(
-                converter._intermediate[input]._convert_intermediate_to_code(converter, inline=inline)
+                converter._intermediate[input]._convert_intermediate_to_code(converter, inline=False)
             )
         result_var_name = converter._cache_dict[self.output]
         code = "{}({}".format(self.name, result_var_name)

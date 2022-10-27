@@ -73,18 +73,21 @@ def set_psuedo(symbol, expr):
 
 
 class Pack(object):
-    def __init__(self, model, netlist, parameter_values=None):
+    def __init__(self, model, netlist, parameter_values=None, functional=False):
         # this is going to be a work in progress for a while:
         # for now, will just do it at the julia level
 
         # Build the cell expression tree with necessary parameters.
         # think about moving this to a separate function.
 
+        self.functional = functional
+
         if parameter_values is not None:
             raise AssertionError("parameter values not supported")
         parameter_values = model.default_parameter_values
+        cell_current = pybamm.PsuedoInputParameter("cell_current")
         parameter_values.update(
-            {"Current function [A]": pybamm.PsuedoInputParameter("cell_current")}
+            {"Current function [A]": cell_current}
         )
         self.cell_parameter_values = parameter_values
 #
@@ -100,6 +103,12 @@ class Pack(object):
         self.len_cell_algebraic = sim.built_model.len_alg
 
         self.cell_size = self.cell_model.shape[0]
+
+        if self.functional:
+            sv = pybamm.StateVector(slice(0,self.cell_size))
+            self.cell_model = pybamm.PybammJuliaFunction([sv, cell_current], self.cell_model, "cell!")
+
+
         self._sv_done = []
         self.built_model = sim.built_model
 
@@ -159,7 +168,7 @@ class Pack(object):
         # this function builds expression trees to compute the current.
 
         # cycle basis is the list of loops over which we will do kirchoff mesh analysis
-        mcb = nx.minimum_cycle_basis(self.circuit_graph)
+        mcb = nx.cycle_basis(self.circuit_graph)
 
         # generate loop currents and current source voltages-- this is what we don't know.
         num_loops = len(mcb)
