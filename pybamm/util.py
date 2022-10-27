@@ -15,7 +15,6 @@ import sys
 import timeit
 from platform import system
 import difflib
-from julia.api import Julia, JuliaInfo, JuliaError
 
 import numpy as np
 import pkg_resources
@@ -292,24 +291,12 @@ def have_julia():
     """
     Checks whether the Julia programming language has been installed
     """
-
-    # Try fetching info about julia
+    # Try reading the julia version quietly to see whether julia is installed
+    FNULL = open(os.devnull, "w")
     try:
-        info = JuliaInfo.load()
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return False
-
-    # Compatibility: Checks
-    if not info.is_pycall_built():  # pragma: no cover
-        return False
-    if not info.is_compatible_python():  # pragma: no cover
-        return False
-
-    # Confirm Julia() is callable
-    try:
-        Julia()
+        subprocess.call(["julia", "--version"], stdout=FNULL, stderr=subprocess.STDOUT)
         return True
-    except JuliaError:  # pragma: no cover
+    except subprocess.CalledProcessError:  # pragma: no cover
         return False
 
 
