@@ -25,14 +25,13 @@ class PsuedoInputParameter(pybamm.InputParameter):
     def children(self, expr):
         self._children = expr
 
-
-def set_psuedo(symbol, expr):
-    if isinstance(symbol, PsuedoInputParameter):
-        symbol.children = [expr]
-    else:
-        for child in symbol.children:
-            set_psuedo(child, expr)
-    symbol.set_id()
+    def set_psuedo(self, symbol, expr):
+        if symbol==self:
+            symbol.children = [expr]
+        else:
+            for child in symbol.children:
+                self.set_psuedo(child, expr)
+        symbol.set_id()
 
 
 def remove_lines_with(input_string, pattern):
