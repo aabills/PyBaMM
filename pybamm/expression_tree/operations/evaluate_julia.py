@@ -26,13 +26,13 @@ class PsuedoInputParameter(pybamm.InputParameter):
         self._children = expr
 
 
-def set_psuedo(symbol, expr):
-    if isinstance(symbol, PsuedoInputParameter):
-        symbol.children = [expr]
-    else:
-        for child in symbol.children:
-            set_psuedo(child, expr)
-    symbol.set_id()
+    def set_psuedo(self, symbol, expr):
+        if self == symbol:
+            symbol.children = [expr]
+        else:
+            for child in symbol.children:
+                self.set_psuedo(child, expr)
+        symbol.set_id()
 
 
 def remove_lines_with(input_string, pattern):
@@ -48,7 +48,8 @@ def remove_lines_with(input_string, pattern):
 # Bottom needs to already have a julia
 # conversion. (for shape.)
 class PybammJuliaFunction(pybamm.Symbol):
-    def __init__(self, children, expr, name):
+    def __init__(self, children, expr, name, inplace):
+        self.inplace = inplace
         self.expr = expr
         super().__init__(name, children)
 
@@ -86,6 +87,10 @@ class JuliaConverter(object):
         if parallel != "legacy-serial" and inline:
             raise NotImplementedError(
                 "Inline not supported with anything other than legacy-serial"
+            )
+        if black_box and black_box != inplace:
+            raise NotImplementedError(
+                "if function is a black box, the pybammjuliafunction spec for inplace must be the same as the converter"
             )
 
         # Characteristics
@@ -202,8 +207,9 @@ class JuliaConverter(object):
                 child_ids.append(child_id)
             shape = symbol.shape
             name = symbol.name
+            inplace = symbol.inplace
             self._intermediate[my_id] = JuliaJuliaFunction(
-                child_ids, my_id, shape, name
+                child_ids, my_id, shape, name, inplace
             )
         elif isinstance(symbol, pybamm.MatrixMultiplication):
             # Break down the binary tree
@@ -668,6 +674,7 @@ class JuliaConverter(object):
         if isinstance(symbol, pybamm.PybammJuliaFunction):
             # need to hash this out a bit more.
             self._black_box = True
+            self._inplace = symbol.inplace
             self.outputs = ["out"]
             self.inputs = []
             for child in symbol.children:
@@ -725,11 +732,12 @@ class JuliaConverter(object):
 
 # this is a bit of a weird one, may change it at some point
 class JuliaJuliaFunction(object):
-    def __init__(self, inputs, output, shape, name):
+    def __init__(self, inputs, output, shape, name, inplace):
         self.inputs = inputs
         self.output = output
         self.shape = shape
         self.name = name
+        self.inplace = inplace
 
     def _convert_intermediate_to_code(
         self, converter: JuliaConverter, inline=False, cache_name=None
@@ -741,15 +749,18 @@ class JuliaJuliaFunction(object):
         input_var_names = []
         for this_input in self.inputs:
             input_var_names.append(
-                converter._intermediate[input]._convert_intermediate_to_code(
-                    converter, inline=inline
+                converter._intermediate[this_input]._convert_intermediate_to_code(
+                    converter, inline=False
                 )
             )
         result_var_name = converter._cache_dict[self.output]
-        code = "{}({}".format(self.name, result_var_name)
+        if self.inplace:
+            code = "{}({},".format(self.name, result_var_name)
+        else:
+            code = "{} .= {}(".format(result_var_name, self.name)
         for this_input in input_var_names:
-            code = code + "," + this_input
-        code = code + ")\n"
+            code = code + this_input + ","
+        code = code[:-1] + ")\n"
 
         # black box always generates a cache.
         self.generate_code_and_dag(converter, code)
