@@ -576,6 +576,9 @@ class JuliaConverter(object):
             self._cache_and_const_string = remove_lines_with(
                 self._cache_and_const_string, top_var_name
             )
+            self._cache_initialization_string = remove_lines_with(
+                self._cache_initialization_string, top_var_name
+            )
 
         # may need to modify this logic a bit in the future.
         if "p" in self.inputs:

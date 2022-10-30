@@ -74,7 +74,9 @@ class Jacobian(object):
                 children_jacs[i] = self.jac(child, variable)
             # _function_jac defined in function class
             jac = symbol._function_jac(children_jacs)
-
+        
+        elif isinstance(symbol, pybamm.PybammJuliaFunction):
+            jac = self.jac(symbol.expr, variable)
         elif isinstance(symbol, pybamm.Concatenation):
             children_jacs = [self.jac(child, variable) for child in symbol.children]
             if len(children_jacs) == 1:

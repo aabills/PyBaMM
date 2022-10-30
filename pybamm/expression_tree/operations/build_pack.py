@@ -11,6 +11,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import liionpack as lp
+from collections import OrderedDict
 
 class offsetter(object):
     def __init__(self, offset):
@@ -44,7 +45,7 @@ class offsetter(object):
 
 
 class Pack(object):
-    def __init__(self, model, netlist, parameter_values=None, functional=False, thermal=False):
+    def __init__(self, model, netlist, parameter_values=None, functional=False, thermal=False, build_jac = False):
         # this is going to be a work in progress for a while:
         # for now, will just do it at the julia level
 
@@ -52,7 +53,7 @@ class Pack(object):
         # think about moving this to a separate function.
 
         self.functional = functional
-
+        self.build_jac = build_jac
         self._thermal = thermal
 
         if parameter_values is not None:
@@ -184,7 +185,10 @@ class Pack(object):
                 expr += self.pack_ambient
             expr = expr / 4
             self.ambient_temperature.set_psuedo(self.batteries[desc]["cell"], expr)
+            if self.build_jac:
+                self.ambient_temperature.set_psuedo(self.batteries[desc]["cell"].expr, expr)
             batt.update({"neighbors" : neighbors})
+
 
 
     def build_pack(self):
@@ -215,17 +219,15 @@ class Pack(object):
 
         # now we know the offset, we should "build" the batteries here. will still need to replace the currents later.
         self.offset = num_loops + len(curr_sources)
-        self.batteries = {}
-        cells = []
+        self.batteries = OrderedDict()
         for index, row in self.netlist.iterrows():
             print("building battery {}".format(len(self.batteries)))
             desc = row["desc"]
             #I'd like a better way to do this.
             if desc[0] == "V":
                 new_cell = self.add_new_cell()
-                cells.append(new_cell)
                 terminal_voltage = self.get_new_terminal_voltage()
-                self.batteries.update({desc: {"cell" : new_cell, "voltage" : terminal_voltage, "current_replaced" : False}})
+                self.batteries[desc] = {"cell" : new_cell, "voltage" : terminal_voltage, "current_replaced" : False}
                 if self._thermal:
                     node1_x = row["node1_x"]
                     node2_x = row["node2_x"]
@@ -250,8 +252,7 @@ class Pack(object):
                     
 
 
-        self.num_cells = len(cells)
-        cell_eqs = pybamm.numpy_concatenation(*cells)
+        self.num_cells = len(self.batteries)
 
         if len(curr_sources) != 1:
             raise NotImplementedError("can't do this yet")
@@ -261,6 +262,9 @@ class Pack(object):
         pack_eqs = self.build_pack_equations(loop_currents, curr_sources)
         self.len_pack_eqs = len(pack_eqs)
         pack_eqs = pybamm.numpy_concatenation(*pack_eqs)
+
+        cells = [d["cell"] for d in self.batteries.values()]
+        cell_eqs = pybamm.numpy_concatenation(*cells)
         
         
         self.pack = pybamm.numpy_concatenation(pack_eqs, cell_eqs)
@@ -324,6 +328,8 @@ class Pack(object):
                                 else:
                                     expr = expr-current
                             self.cell_current.set_psuedo(self.batteries[self.circuit_graph.edges[edge]["desc"]]["cell"], expr)
+                            if self.build_jac:
+                                self.cell_current.set_psuedo(self.batteries[self.circuit_graph.edges[edge]["desc"]]["cell"].expr, expr)
                             self.batteries[self.circuit_graph.edges[edge]["desc"]]["current_replaced"] = True
                         voltage = self.batteries[self.circuit_graph.edges[edge]["desc"]]["voltage"]
                         if direction =="positive":
