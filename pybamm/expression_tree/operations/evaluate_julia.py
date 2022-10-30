@@ -101,7 +101,10 @@ class JuliaConverter(object):
         self._inplace = inplace
         self._dae_type = dae_type
 
-        self._type = "Float64"
+        if cache_type =="gpu":
+            self._type = "Float32"
+        else:
+            self._type = "Float64"
         self._inline = inline
         self._parallel = parallel
         self._black_box = black_box
@@ -1193,9 +1196,11 @@ class JuliaTime(JuliaScalar):
 
 
 class JuliaInput(JuliaScalar):
-    def __init__(self, my_id, name):
+    def __init__(self, my_id, name, shape=None):
         self.output = my_id
-        self.shape = (1, 1)
+        if shape is None:
+            shape = (1, 1)
+        self.shape = shape
         self.name = name
 
     def _convert_intermediate_to_code(self, converter, inline=True, cache_name=None):

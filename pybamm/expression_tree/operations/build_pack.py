@@ -4,6 +4,7 @@
 
 #TODO
 # - Eliminate node1x & node1y (use graph only)
+# - x lumped thermal for pouch cells?
 import pybamm
 from copy import deepcopy
 import networkx as nx
@@ -90,9 +91,9 @@ class Pack(object):
         if self.functional:
             sv = pybamm.StateVector(slice(0,self.cell_size))
             if self._thermal:
-                self.cell_model = pybamm.PybammJuliaFunction([sv, cell_current, ambient_temperature], self.cell_model, "cell!", False)
+                self.cell_model = pybamm.PybammJuliaFunction([sv, cell_current, ambient_temperature], self.cell_model, "cell!", True)
             else:
-                self.cell_model = pybamm.PybammJuliaFunction([sv, cell_current], self.cell_model, "cell!", False)
+                self.cell_model = pybamm.PybammJuliaFunction([sv, cell_current], self.cell_model, "cell!", True)
 
 
         self._sv_done = []
@@ -152,7 +153,7 @@ class Pack(object):
         return symbol
 
     def get_new_cell_temperature(self):
-        symbol = deepcopy(self.built_model.variables["Cell temperature [K]"])
+        symbol = pybamm.Index(deepcopy(self.built_model.variables["Cell temperature [K]"]), slice(0,1))
         my_offsetter = offsetter(self.offset)
         my_offsetter.add_offset_to_state_vectors(symbol)
         return symbol
@@ -190,6 +191,7 @@ class Pack(object):
         # this function builds expression trees to compute the current.
 
         # cycle basis is the list of loops over which we will do kirchoff mesh analysis
+        print("calculating cycle basis")
         mcb = nx.cycle_basis(self.circuit_graph)
 
         # generate loop currents and current source voltages-- this is what we don't know.
@@ -216,6 +218,7 @@ class Pack(object):
         self.batteries = {}
         cells = []
         for index, row in self.netlist.iterrows():
+            print("building battery {}".format(len(self.batteries)))
             desc = row["desc"]
             #I'd like a better way to do this.
             if desc[0] == "V":
@@ -223,13 +226,11 @@ class Pack(object):
                 cells.append(new_cell)
                 terminal_voltage = self.get_new_terminal_voltage()
                 self.batteries.update({desc: {"cell" : new_cell, "voltage" : terminal_voltage, "current_replaced" : False}})
-                self.offset += self.cell_size
                 if self._thermal:
                     node1_x = row["node1_x"]
                     node2_x = row["node2_x"]
                     node1_y = row["node1_y"]
                     node2_y = row["node2_y"]
-                    temperature = self.get_new_cell_temperature()
                     if node1_x != node2_x:
                         raise AssertionError(
                             "x's must be the same"
@@ -239,7 +240,10 @@ class Pack(object):
                             "batteries can only take up one y"
                         )
                     batt_y = min(node1_y, node2_y) + 0.5
+                    temperature = self.get_new_cell_temperature()
                     self.batteries[desc].update({"x" : node1_x, "y": batt_y, "temperature": temperature})
+                self.batteries[desc].update({"offset" : self.offset})
+                self.offset += self.cell_size
         
         if self._thermal:
             self.build_thermal_equations()
@@ -320,6 +324,7 @@ class Pack(object):
                                 else:
                                     expr = expr-current
                             self.cell_current.set_psuedo(self.batteries[self.circuit_graph.edges[edge]["desc"]]["cell"], expr)
+                            self.batteries[self.circuit_graph.edges[edge]["desc"]]["current_replaced"] = True
                         voltage = self.batteries[self.circuit_graph.edges[edge]["desc"]]["voltage"]
                         if direction =="positive":
                             eq.append(voltage)
