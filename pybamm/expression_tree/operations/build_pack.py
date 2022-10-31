@@ -309,7 +309,7 @@ class Pack(object):
                         else:
                             this_edge_current = this_edge_current - current
                     if edge_type == "R":
-                        eq.append(- this_edge_current * self.circuit_graph.edges[edge]["value"])
+                        eq.append(this_edge_current * self.circuit_graph.edges[edge]["value"])
                     elif edge_type == "I":
                         curr_source_num = self.circuit_graph.edges[edge]["desc"][1:]
                         if curr_source_num != "0":
