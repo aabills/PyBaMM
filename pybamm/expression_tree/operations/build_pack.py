@@ -331,9 +331,9 @@ class Pack(object):
                             self.batteries[self.circuit_graph.edges[edge]["desc"]]["current_replaced"] = True
                         voltage = self.batteries[self.circuit_graph.edges[edge]["desc"]]["voltage"]
                         if direction[0] == self.circuit_graph.edges[edge]["positive_node"]:
-                            eq.append(-voltage)
-                        else:
                             eq.append(voltage)
+                        else:
+                            eq.append(-voltage)
                         #check to see if the battery input current has been replaced yet. 
                         #If not, replace the current with the actual current.
                         
