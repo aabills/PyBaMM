@@ -406,8 +406,8 @@ class Pack(object):
             expr = pybamm.Scalar(self.circuit_graph.edges[curr_source]["value"])
             for current in currents:
                 if (
-                    self.circuit_graph.edges[curr_source]["currents"][current]
-                    == "positive"
+                    self.circuit_graph.edges[curr_source]["currents"][current][0]
+                    == self.circuit_graph.edges[curr_source]["positive_node"]
                 ):
                     expr = expr + current
                 else:
