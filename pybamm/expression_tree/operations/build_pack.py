@@ -182,7 +182,7 @@ class Pack(object):
                     if is_vert or is_horz:
                         neighbors.append(other_desc)
             ambient_start = len(neighbors)
-            if len(neighbors>0):
+            if len(neighbors)>0:
                 expr = self.batteries[neighbors[0]]["temperature"]
             else:
                 expr = self.pack_ambient
