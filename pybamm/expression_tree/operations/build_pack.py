@@ -358,7 +358,7 @@ class Pack(object):
                         if not self.batteries[self.circuit_graph.edges[edge]["desc"]][
                             "current_replaced"
                         ]:
-                            if self.circuit_graph.edges[edge]["currents"][loop_current][0] == self.circuit_graph.edges[edge]["positive_direction"]:
+                            if self.circuit_graph.edges[edge]["currents"][loop_current][0] == self.circuit_graph.edges[edge]["positive_node"]:
                                 this_edge_current = -this_edge_current
                             expr = this_edge_current
                             self.cell_current.set_psuedo(
