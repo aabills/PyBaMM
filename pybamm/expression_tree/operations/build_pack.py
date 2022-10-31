@@ -324,7 +324,7 @@ class Pack(object):
                     elif edge_type == "V":
                         #first, check and see if the battery has been done yet.
                         if not self.batteries[self.circuit_graph.edges[edge]["desc"]]["current_replaced"]:
-                            expr = this_edge_current
+                            expr = - this_edge_current
                             self.cell_current.set_psuedo(self.batteries[self.circuit_graph.edges[edge]["desc"]]["cell"], expr)
                             if self.build_jac:
                                 self.cell_current.set_psuedo(self.batteries[self.circuit_graph.edges[edge]["desc"]]["cell"].expr, expr)
