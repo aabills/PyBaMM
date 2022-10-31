@@ -216,7 +216,6 @@ class Pack(object):
         # this function builds expression trees to compute the current.
 
         # cycle basis is the list of loops over which we will do kirchoff mesh analysis
-        print("calculating cycle basis")
         mcb = nx.cycle_basis(self.circuit_graph)
         self.cyc_basis = deepcopy(mcb)
 
@@ -233,7 +232,6 @@ class Pack(object):
             pybamm.StateVector(slice(n, n + 1), name="current_{}".format(n))
             for n in range(num_loops)
         ]
-        # print(loop_current.y_slices for loop_current in loop_currents)
 
         curr_sources = []
         n = num_loops
@@ -249,7 +247,6 @@ class Pack(object):
         self.offset = num_loops + len(curr_sources)
         self.batteries = OrderedDict()
         for index, row in self.netlist.iterrows():
-            print("building battery {}".format(len(self.batteries)))
             desc = row["desc"]
             # I'd like a better way to do this.
             if desc[0] == "V":
@@ -430,7 +427,6 @@ class Pack(object):
     def place_currents(self, loop_currents, mcb):
         bottom_loop = 0
         for this_loop, loop in enumerate(mcb):
-            print("Now doing loop {}".format(loop))
             node = loop[0]
             done_nodes = set()
             this_node = node
@@ -452,9 +448,6 @@ class Pack(object):
                     next_node = min(my_neighbors)
                 else:
                     next_node = min(my_neighbors)
-                #print("Done nodes: {}".format(done_nodes))
-                #print("Possibilities: {}".format(my_neighbors))
-                #print("At {} going to node {}".format(this_node, next_node))
                 
                 if len(loop) == len(done_nodes) + 1 and not last_one:
                     last_one = True
