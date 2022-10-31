@@ -3,11 +3,9 @@
 #
 
 # TODO
-# - Eliminate node1x & node1y (use graph only)
 # - x lumped thermal for pouch cells?
 # - Jacobians
 # - parallel
-# - SPM/SPMe
 # - GPU offload
 # - smarter initialization (use assume all cells have same current, solve prob)
 import pybamm
@@ -86,6 +84,7 @@ class Pack(object):
             parameter_values.update({"Ambient temperature [K]": ambient_temperature})
 
         self.cell_parameter_values = parameter_values
+        self.unbuilt_model = model
         #
         sim = pybamm.Simulation(model, parameter_values=parameter_values)
         sim.build()
@@ -377,6 +376,14 @@ class Pack(object):
                         voltage = self.batteries[
                             self.circuit_graph.edges[edge]["desc"]
                         ]["voltage"]
+                        if isinstance(self.unbuilt_model, pybamm.lithium_ion.SPM) or isinstance(self.unbuilt_model, pybamm.lithium_ion.SPMe):
+                            self.cell_current.set_psuedo(
+                                    self.batteries[
+                                        self.circuit_graph.edges[edge]["desc"]
+                                    ]["voltage"],
+                                    expr,
+                                )
+
                         if (
                             direction[0]
                             == self.circuit_graph.edges[edge]["positive_node"]
