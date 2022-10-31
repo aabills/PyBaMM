@@ -304,12 +304,12 @@ class Pack(object):
                     for current in self.circuit_graph.edges[edge]["currents"]:
                         if current == loop_current:
                             continue
-                        if self.circuit_graph.edges[edge]["currents"][current] == "positive":
+                        if self.circuit_graph.edges[edge]["currents"][current] == direction:
                             this_edge_current = this_edge_current + current
                         else:
                             this_edge_current = this_edge_current - current
                     if edge_type == "R":
-                        eq.append(this_edge_current * self.circuit_graph.edges[edge]["value"])
+                        eq.append(- this_edge_current * self.circuit_graph.edges[edge]["value"])
                     elif edge_type == "I":
                         curr_source_num = self.circuit_graph.edges[edge]["desc"][1:]
                         if curr_source_num != "0":
@@ -317,24 +317,14 @@ class Pack(object):
                                 "multiple current sources is not yet supported"
                             )
 
-                        if direction == "positive":
+                        if self.circuit_graph.edges[edge]["currents"][current] == direction:
                             eq.append(self.circuit_graph.edges[edge]["voltage"])
                         else:
                             eq.append(-self.circuit_graph.edges[edge]["voltage"])
                     elif edge_type == "V":
                         #first, check and see if the battery has been done yet.
                         if not self.batteries[self.circuit_graph.edges[edge]["desc"]]["current_replaced"]:
-                            currents = list(self.circuit_graph.edges[edge]["currents"])
-                            
-                            if self.circuit_graph.edges[edge]["currents"][currents[0]] == "positive":
-                                expr = currents[0]
-                            else:
-                                expr = -currents[0]
-                            for current in currents[1:]:
-                                if self.circuit_graph.edges[edge]["currents"][current] == "positive":
-                                    expr = expr+current
-                                else:
-                                    expr = expr-current
+                            expr = this_edge_current
                             self.cell_current.set_psuedo(self.batteries[self.circuit_graph.edges[edge]["desc"]]["cell"], expr)
                             if self.build_jac:
                                 self.cell_current.set_psuedo(self.batteries[self.circuit_graph.edges[edge]["desc"]]["cell"].expr, expr)
@@ -450,10 +440,7 @@ class Pack(object):
                             raise KeyError("uh oh")
 
                         # add this current to the loop.
-                        if inner_node == edge["positive_node"]:
-                            direction = "negative"
-                        else:
-                            direction = "positive"
+                        direction = (inner_node, next_node)
 
                         edge["currents"].update(
                             {loop_currents[this_loop]: direction}
