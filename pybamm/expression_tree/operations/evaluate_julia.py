@@ -442,7 +442,7 @@ class JuliaConverter(object):
                     )
                 )
                 self._cache_initialization_string += (
-                    "{} = PreallocationTools.get_tmp({}_init,(@view y[1:{}]))\n".format(
+                    "{} = PreallocationTools.get_tmp({}_init,(@view y))\n".format(
                         cache_name, cache_name, cache_shape[0]
                     )
                 )
@@ -458,7 +458,7 @@ class JuliaConverter(object):
                     )
                 )
                 self._cache_initialization_string += (
-                    "   {} = PyBaMM.get_tmp({}_init,(@view y[1:{}]))\n".format(
+                    "   {} = PyBaMM.get_tmp({}_init,(@view y))\n".format(
                         cache_name, cache_name, cache_shape[0]
                     )
                 )
@@ -553,6 +553,22 @@ class JuliaConverter(object):
                 self._function_string += "end\n"
         elif self._parallel == "legacy-serial":
             pass
+        elif self._parallel == "Distributed-Spawn":
+            if self._cache_type != "SharedArray":
+                raise AssertionError(
+                    "for distributed to work, caches must be shared arrays"
+                )
+            ts.prepare()
+            while ts.is_active():
+                self._function_string += "@sync begin\n"
+                for node in ts.get_ready():
+                    code = self._code.get(node)
+                    if code is not None:
+                        code = code[0:-1]
+                        code = "@spawnat :any begin " + code + " end\n"
+                        self._function_string += code
+                    ts.done(node)
+                self._function_string += "end\n"
         else:
             raise NotImplementedError()
 
