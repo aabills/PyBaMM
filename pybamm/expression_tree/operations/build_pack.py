@@ -2,7 +2,7 @@
 # convert an expression tree into a pack model
 #
 
-#TODO
+# TODO
 # - Eliminate node1x & node1y (use graph only)
 # - x lumped thermal for pouch cells?
 # - Jacobians
@@ -18,11 +18,11 @@ import pandas as pd
 import liionpack as lp
 from collections import OrderedDict
 
+
 class offsetter(object):
     def __init__(self, offset):
         self._sv_done = []
         self.offset = offset
-
 
     def add_offset_to_state_vectors(self, symbol):
         # this function adds an offset to the state vectors
@@ -50,7 +50,15 @@ class offsetter(object):
 
 
 class Pack(object):
-    def __init__(self, model, netlist, parameter_values=None, functional=False, thermal=False, build_jac = False):
+    def __init__(
+        self,
+        model,
+        netlist,
+        parameter_values=None,
+        functional=False,
+        thermal=False,
+        build_jac=False,
+    ):
         # this is going to be a work in progress for a while:
         # for now, will just do it at the julia level
 
@@ -64,23 +72,21 @@ class Pack(object):
         if parameter_values is not None:
             raise AssertionError("parameter values not supported")
         parameter_values = model.default_parameter_values
-        
+
         cell_current = pybamm.PsuedoInputParameter("cell_current")
         self.cell_current = cell_current
-        parameter_values.update(
-            {"Current function [A]": cell_current}
-        )
+        parameter_values.update({"Current function [A]": cell_current})
 
         if self._thermal:
-            self.pack_ambient = pybamm.Scalar(parameter_values["Ambient temperature [K]"])
+            self.pack_ambient = pybamm.Scalar(
+                parameter_values["Ambient temperature [K]"]
+            )
             ambient_temperature = pybamm.PsuedoInputParameter("ambient_temperature")
             self.ambient_temperature = ambient_temperature
-            parameter_values.update(
-                {"Ambient temperature [K]": ambient_temperature}
-            )
+            parameter_values.update({"Ambient temperature [K]": ambient_temperature})
 
         self.cell_parameter_values = parameter_values
-#
+        #
         sim = pybamm.Simulation(model, parameter_values=parameter_values)
         sim.build()
         self.cell_model = pybamm.numpy_concatenation(
@@ -95,12 +101,18 @@ class Pack(object):
         self.cell_size = self.cell_model.shape[0]
 
         if self.functional:
-            sv = pybamm.StateVector(slice(0,self.cell_size))
+            sv = pybamm.StateVector(slice(0, self.cell_size))
             if self._thermal:
-                self.cell_model = pybamm.PybammJuliaFunction([sv, cell_current, ambient_temperature], self.cell_model, "cell!", True)
+                self.cell_model = pybamm.PybammJuliaFunction(
+                    [sv, cell_current, ambient_temperature],
+                    self.cell_model,
+                    "cell!",
+                    True,
+                )
             else:
-                self.cell_model = pybamm.PybammJuliaFunction([sv, cell_current], self.cell_model, "cell!", True)
-
+                self.cell_model = pybamm.PybammJuliaFunction(
+                    [sv, cell_current], self.cell_model, "cell!", True
+                )
 
         self._sv_done = []
         self.built_model = sim.built_model
@@ -140,8 +152,7 @@ class Pack(object):
         self.netlist["negative_node"] = self.netlist["target"]
         self.circuit_graph = nx.from_pandas_edgelist(self.netlist, edge_attr=True)
 
-
-    #Function that adds new cells, and puts them in the appropriate places.
+    # Function that adds new cells, and puts them in the appropriate places.
     def add_new_cell(self):
         # TODO: deal with variables dict here too.
         # This is the place to get clever.
@@ -159,12 +170,14 @@ class Pack(object):
         return symbol
 
     def get_new_cell_temperature(self):
-        symbol = pybamm.Index(deepcopy(self.built_model.variables["Cell temperature [K]"]), slice(0,1))
+        symbol = pybamm.Index(
+            deepcopy(self.built_model.variables["Cell temperature [K]"]), slice(0, 1)
+        )
         my_offsetter = offsetter(self.offset)
         my_offsetter.add_offset_to_state_vectors(symbol)
         return symbol
 
-    def build_thermal_equations(self):       
+    def build_thermal_equations(self):
         for desc in self.batteries:
             batt = self.batteries[desc]
             batt_x = batt["x"]
@@ -172,7 +185,7 @@ class Pack(object):
             neighbors = []
             for other_desc in self.batteries:
                 if other_desc == desc:
-                    #its the same battery
+                    # its the same battery
                     continue
                 else:
                     other_x = self.batteries[other_desc]["x"]
@@ -182,7 +195,7 @@ class Pack(object):
                     if is_vert or is_horz:
                         neighbors.append(other_desc)
             ambient_start = len(neighbors)
-            if len(neighbors)>0:
+            if len(neighbors) > 0:
                 expr = self.batteries[neighbors[0]]["temperature"]
             else:
                 expr = self.pack_ambient
@@ -194,10 +207,10 @@ class Pack(object):
             expr = expr / 4
             self.ambient_temperature.set_psuedo(self.batteries[desc]["cell"], expr)
             if self.build_jac:
-                self.ambient_temperature.set_psuedo(self.batteries[desc]["cell"].expr, expr)
-            batt.update({"neighbors" : neighbors})
-
-
+                self.ambient_temperature.set_psuedo(
+                    self.batteries[desc]["cell"].expr, expr
+                )
+            batt.update({"neighbors": neighbors})
 
     def build_pack(self):
         # this function builds expression trees to compute the current.
@@ -209,19 +222,25 @@ class Pack(object):
         # generate loop currents and current source voltages-- this is what we don't know.
         num_loops = len(mcb)
 
-        curr_sources = [edge for edge in self.circuit_graph.edges if self.circuit_graph.edges[edge]["desc"][0]=="I"]
+        curr_sources = [
+            edge
+            for edge in self.circuit_graph.edges
+            if self.circuit_graph.edges[edge]["desc"][0] == "I"
+        ]
 
         loop_currents = [
-            pybamm.StateVector(slice(n,n+1), name="current_{}".format(n))
+            pybamm.StateVector(slice(n, n + 1), name="current_{}".format(n))
             for n in range(num_loops)
         ]
-        #print(loop_current.y_slices for loop_current in loop_currents)
+        # print(loop_current.y_slices for loop_current in loop_currents)
 
         curr_sources = []
         n = num_loops
         for edge in self.circuit_graph.edges:
             if self.circuit_graph.edges[edge]["desc"][0] == "I":
-                self.circuit_graph.edges[edge]["voltage"] = pybamm.StateVector(slice(n, n + 1), name="current_source_{}".format(n))
+                self.circuit_graph.edges[edge]["voltage"] = pybamm.StateVector(
+                    slice(n, n + 1), name="current_source_{}".format(n)
+                )
                 n += 1
                 curr_sources.append(edge)
 
@@ -231,34 +250,34 @@ class Pack(object):
         for index, row in self.netlist.iterrows():
             print("building battery {}".format(len(self.batteries)))
             desc = row["desc"]
-            #I'd like a better way to do this.
+            # I'd like a better way to do this.
             if desc[0] == "V":
                 new_cell = self.add_new_cell()
                 terminal_voltage = self.get_new_terminal_voltage()
-                self.batteries[desc] = {"cell" : new_cell, "voltage" : terminal_voltage, "current_replaced" : False}
+                self.batteries[desc] = {
+                    "cell": new_cell,
+                    "voltage": terminal_voltage,
+                    "current_replaced": False,
+                }
                 if self._thermal:
                     node1_x = row["node1_x"]
                     node2_x = row["node2_x"]
                     node1_y = row["node1_y"]
                     node2_y = row["node2_y"]
                     if node1_x != node2_x:
-                        raise AssertionError(
-                            "x's must be the same"
-                        )
-                    if abs(node1_y-node2_y) != 1:
-                        raise AssertionError(
-                            "batteries can only take up one y"
-                        )
+                        raise AssertionError("x's must be the same")
+                    if abs(node1_y - node2_y) != 1:
+                        raise AssertionError("batteries can only take up one y")
                     batt_y = min(node1_y, node2_y) + 0.5
                     temperature = self.get_new_cell_temperature()
-                    self.batteries[desc].update({"x" : node1_x, "y": batt_y, "temperature": temperature})
-                self.batteries[desc].update({"offset" : self.offset})
+                    self.batteries[desc].update(
+                        {"x": node1_x, "y": batt_y, "temperature": temperature}
+                    )
+                self.batteries[desc].update({"offset": self.offset})
                 self.offset += self.cell_size
-        
+
         if self._thermal:
             self.build_thermal_equations()
-                    
-
 
         self.num_cells = len(self.batteries)
 
@@ -273,19 +292,23 @@ class Pack(object):
 
         cells = [d["cell"] for d in self.batteries.values()]
         cell_eqs = pybamm.numpy_concatenation(*cells)
-        
-        
+
         self.pack = pybamm.numpy_concatenation(pack_eqs, cell_eqs)
         self.ics = self.initialize_pack(num_loops, len(curr_sources))
 
-
     def initialize_pack(self, num_loops, num_curr_sources):
         curr_ics = pybamm.Vector([1.0 for curr_source in range(num_loops)])
-        curr_source_v_ics = pybamm.Vector([1.0 for curr_source in range(num_curr_sources)])
-        cell_ics = pybamm.numpy_concatenation(*[self.built_model.concatenated_initial_conditions for n in range(len(self.batteries))])
+        curr_source_v_ics = pybamm.Vector(
+            [1.0 for curr_source in range(num_curr_sources)]
+        )
+        cell_ics = pybamm.numpy_concatenation(
+            *[
+                self.built_model.concatenated_initial_conditions
+                for n in range(len(self.batteries))
+            ]
+        )
         ics = pybamm.numpy_concatenation(*[curr_ics, curr_source_v_ics, cell_ics])
         return ics
-
 
     def build_pack_equations(self, loop_currents, curr_sources):
         # start by looping through the loop currents. Sum Voltages
@@ -296,7 +319,7 @@ class Pack(object):
             eq = []
             for edge in self.circuit_graph.edges:
                 if loop_current in self.circuit_graph.edges[edge]["currents"]:
-                    #get the name of the edge current. 
+                    # get the name of the edge current.
                     edge_type = self.circuit_graph.edges[edge]["desc"][0]
                     desc = self.circuit_graph.edges[edge]["desc"]
                     direction = self.circuit_graph.edges[edge]["currents"][loop_current]
@@ -304,12 +327,17 @@ class Pack(object):
                     for current in self.circuit_graph.edges[edge]["currents"]:
                         if current == loop_current:
                             continue
-                        if self.circuit_graph.edges[edge]["currents"][current] == direction:
+                        elif (
+                            self.circuit_graph.edges[edge]["currents"][current]
+                            == direction
+                        ):
                             this_edge_current = this_edge_current + current
                         else:
                             this_edge_current = this_edge_current - current
                     if edge_type == "R":
-                        eq.append(this_edge_current * self.circuit_graph.edges[edge]["value"])
+                        eq.append(
+                            this_edge_current * self.circuit_graph.edges[edge]["value"]
+                        )
                     elif edge_type == "I":
                         curr_source_num = self.circuit_graph.edges[edge]["desc"][1:]
                         if curr_source_num != "0":
@@ -317,26 +345,47 @@ class Pack(object):
                                 "multiple current sources is not yet supported"
                             )
 
-                        if self.circuit_graph.edges[edge]["currents"][current] == direction:
+                        if (
+                            self.circuit_graph.edges[edge]["currents"][current]
+                            == direction
+                        ):
                             eq.append(self.circuit_graph.edges[edge]["voltage"])
                         else:
                             eq.append(-self.circuit_graph.edges[edge]["voltage"])
                     elif edge_type == "V":
-                        #first, check and see if the battery has been done yet.
-                        if not self.batteries[self.circuit_graph.edges[edge]["desc"]]["current_replaced"]:
+                        # first, check and see if the battery has been done yet.
+                        if not self.batteries[self.circuit_graph.edges[edge]["desc"]][
+                            "current_replaced"
+                        ]:
                             expr = this_edge_current
-                            self.cell_current.set_psuedo(self.batteries[self.circuit_graph.edges[edge]["desc"]]["cell"], expr)
+                            self.cell_current.set_psuedo(
+                                self.batteries[self.circuit_graph.edges[edge]["desc"]][
+                                    "cell"
+                                ],
+                                expr,
+                            )
                             if self.build_jac:
-                                self.cell_current.set_psuedo(self.batteries[self.circuit_graph.edges[edge]["desc"]]["cell"].expr, expr)
-                            self.batteries[self.circuit_graph.edges[edge]["desc"]]["current_replaced"] = True
-                        voltage = self.batteries[self.circuit_graph.edges[edge]["desc"]]["voltage"]
-                        if direction[0] == self.circuit_graph.edges[edge]["positive_node"]:
+                                self.cell_current.set_psuedo(
+                                    self.batteries[
+                                        self.circuit_graph.edges[edge]["desc"]
+                                    ]["cell"].expr,
+                                    expr,
+                                )
+                            self.batteries[self.circuit_graph.edges[edge]["desc"]][
+                                "current_replaced"
+                            ] = False
+                        voltage = self.batteries[
+                            self.circuit_graph.edges[edge]["desc"]
+                        ]["voltage"]
+                        if (
+                            direction[0]
+                            == self.circuit_graph.edges[edge]["positive_node"]
+                        ):
                             eq.append(voltage)
                         else:
                             eq.append(-voltage)
-                        #check to see if the battery input current has been replaced yet. 
-                        #If not, replace the current with the actual current.
-                        
+                        # check to see if the battery input current has been replaced yet.
+                        # If not, replace the current with the actual current.
 
             if len(eq) == 0:
                 raise NotImplementedError(
@@ -352,21 +401,21 @@ class Pack(object):
             pack_equations.append(expr)
 
         # then loop through the current source voltages. Sum Currents.
-        for i,curr_source in enumerate(curr_sources):
+        for i, curr_source in enumerate(curr_sources):
             currents = list(self.circuit_graph.edges[curr_source]["currents"])
             expr = pybamm.Scalar(self.circuit_graph.edges[curr_source]["value"])
             for current in currents:
-                if self.circuit_graph.edges[curr_source]["currents"][current] == "positive":
-                    expr = expr+current
+                if (
+                    self.circuit_graph.edges[curr_source]["currents"][current]
+                    == "positive"
+                ):
+                    expr = expr + current
                 else:
-                    expr = expr-current
+                    expr = expr - current
             pack_equations.append(expr)
-        
-        #concatenate all the pack equations and return it.
+
+        # concatenate all the pack equations and return it.
         return pack_equations
-
-
-            
 
     # This function places the currents on the edges in a predefined order.
     # it begins at loop 0, and loops through each "loop" -- really a cycle
@@ -442,8 +491,6 @@ class Pack(object):
                         # add this current to the loop.
                         direction = (inner_node, next_node)
 
-                        edge["currents"].update(
-                            {loop_currents[this_loop]: direction}
-                        )
+                        edge["currents"].update({loop_currents[this_loop]: direction})
                         inner_node = next_node
                     break
