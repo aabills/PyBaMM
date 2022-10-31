@@ -5,6 +5,11 @@
 #TODO
 # - Eliminate node1x & node1y (use graph only)
 # - x lumped thermal for pouch cells?
+# - Jacobians
+# - parallel
+# - SPM/SPMe
+# - GPU offload
+# - smarter initialization (use assume all cells have same current, solve prob)
 import pybamm
 from copy import deepcopy
 import networkx as nx
@@ -177,7 +182,10 @@ class Pack(object):
                     if is_vert or is_horz:
                         neighbors.append(other_desc)
             ambient_start = len(neighbors)
-            expr = self.batteries[neighbors[0]]["temperature"]
+            if len(neighbors>0):
+                expr = self.batteries[neighbors[0]]["temperature"]
+            else:
+                expr = self.pack_ambient
             for neighbor in neighbors[1:]:
                 expr += self.batteries[neighbor]["temperature"]
             for ambient_aux in range(ambient_start, 4):
