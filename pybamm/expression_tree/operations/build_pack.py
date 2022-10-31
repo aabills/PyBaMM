@@ -218,6 +218,7 @@ class Pack(object):
         # cycle basis is the list of loops over which we will do kirchoff mesh analysis
         print("calculating cycle basis")
         mcb = nx.cycle_basis(self.circuit_graph)
+        self.cyc_basis = deepcopy(mcb)
 
         # generate loop currents and current source voltages-- this is what we don't know.
         num_loops = len(mcb)
@@ -373,7 +374,7 @@ class Pack(object):
                                 )
                             self.batteries[self.circuit_graph.edges[edge]["desc"]][
                                 "current_replaced"
-                            ] = False
+                            ] = True
                         voltage = self.batteries[
                             self.circuit_graph.edges[edge]["desc"]
                         ]["voltage"]
@@ -427,70 +428,45 @@ class Pack(object):
     def place_currents(self, loop_currents, mcb):
         bottom_loop = 0
         for this_loop, loop in enumerate(mcb):
-            for node in sorted(self.circuit_graph.nodes):
-                if node in loop:
-                    # setting var to remove the loop later
-                    done_nodes = set()
-                    # doesn't actually matter where we start.
-                    # loop will always be a set.
-                    if len(loop) != len(set(loop)):
-                        raise NotImplementedError()
-                    inner_node = node
-                    # calculate the centroid of the loop
-                    loop_xs = [self.node_xs[n] for n in loop]
-                    loop_ys = [self.node_ys[n] for n in loop]
-                    centroid_x = np.mean(loop_xs)
-                    centroid_y = np.mean(loop_ys)
-                    last_one = False
-                    while True:
-                        done_nodes.add(inner_node)
+            print("Now doing loop {}".format(loop))
+            node = loop[0]
+            done_nodes = set()
+            this_node = node
+            last_one = False
+            while True:
+                done_nodes.add(this_node)
+                neighbors = self.circuit_graph.neighbors(this_node)
+                
 
-                        my_neighbors = set(
-                            self.circuit_graph.neighbors(inner_node)
-                        ).intersection(set(loop))
+                my_neighbors = set(
+                    self.circuit_graph.neighbors(this_node)
+                ).intersection(set(loop))
+                # if there are no neighbors in the group that have not been done, ur done!
+                my_neighbors = my_neighbors - done_nodes
 
-                        # if there are no neighbors in the group that have not been done, ur done!
-                        my_neighbors = my_neighbors - done_nodes
-
-                        if len(my_neighbors) == 0:
-                            break
-                        elif len(loop) == len(done_nodes) + 1 and not last_one:
-                            last_one = True
-                            done_nodes.remove(node)
-
-                        # calculate the angle to all the neighbors.
-                        # then, to go clockwise, pick the one with
-                        # the largest angle.
-                        my_x = self.node_xs[inner_node]
-                        my_y = self.node_ys[inner_node]
-                        angles = {
-                            n: np.arctan2(
-                                self.node_xs[n] - centroid_x,
-                                self.node_ys[n] - centroid_y,
-                            )
-                            for n in my_neighbors
-                        }
-                        next_node = max(angles, key=angles.get)
-                        # print("at node {}, now going to node {}".format(inner_node, next_node))
-                        # print(len(angles))
-
-                        # now, define the vector from the current node to the next node.
-                        next_coords = [
-                            self.node_xs[next_node] - my_x,
-                            self.node_ys[next_node] - my_y,
-                        ]
-
-                        # go find the edge.
-
-                        edge = self.circuit_graph.edges.get((inner_node, next_node))
-                        if edge is None:
-                            edge = self.circuit_graph.edges.get((next_node, inner_node))
-                        if edge is None:
-                            raise KeyError("uh oh")
-
-                        # add this current to the loop.
-                        direction = (inner_node, next_node)
-
-                        edge["currents"].update({loop_currents[this_loop]: direction})
-                        inner_node = next_node
+                if len(my_neighbors) == 0:
                     break
+                elif len(my_neighbors) == 1:
+                    next_node = min(my_neighbors)
+                else:
+                    next_node = min(my_neighbors)
+                #print("Done nodes: {}".format(done_nodes))
+                #print("Possibilities: {}".format(my_neighbors))
+                #print("At {} going to node {}".format(this_node, next_node))
+                
+                if len(loop) == len(done_nodes) + 1 and not last_one:
+                    last_one = True
+                    done_nodes.remove(node)
+                
+                # go find the edge.
+                edge = self.circuit_graph.edges.get((this_node, next_node))
+                if edge is None:
+                    edge = self.circuit_graph.edges.get((next_node, this_node))
+                if edge is None:
+                    raise KeyError("uh oh")
+
+                # add this current to the loop.
+                direction = (this_node, next_node)
+
+                edge["currents"].update({loop_currents[this_loop]: direction})
+                this_node = next_node
