@@ -442,7 +442,7 @@ class JuliaConverter(object):
                     )
                 )
                 self._cache_initialization_string += (
-                    "{} = PreallocationTools.get_tmp({}_init,(@view y))\n".format(
+                    "{} = PreallocationTools.get_tmp({}_init, y)\n".format(
                         cache_name, cache_name, cache_shape[0]
                     )
                 )
@@ -458,7 +458,7 @@ class JuliaConverter(object):
                     )
                 )
                 self._cache_initialization_string += (
-                    "   {} = PyBaMM.get_tmp({}_init,(@view y))\n".format(
+                    "   {} = PyBaMM.get_tmp({}_init, y)\n".format(
                         cache_name, cache_name, cache_shape[0]
                     )
                 )
