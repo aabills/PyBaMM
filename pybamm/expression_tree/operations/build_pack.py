@@ -409,9 +409,9 @@ class Pack(object):
                     self.circuit_graph.edges[curr_source]["currents"][current][0]
                     == self.circuit_graph.edges[curr_source]["positive_node"]
                 ):
-                    expr = expr + current
-                else:
                     expr = expr - current
+                else:
+                    expr = expr + current
             pack_equations.append(expr)
 
         # concatenate all the pack equations and return it.
