@@ -427,20 +427,33 @@ class JuliaConverter(object):
                     cache_shape_st = "({})".format(cache_shape[0])
                 else:
                     cache_shape_st = cache_shape
-                self._cache_and_const_string += "{} = zeros{}\n".format(
-                    cache_name, cache_shape_st
-                )
+                if self._parallel == "Distributed-Shared":
+                    self._cache_and_const_string += "{} = SharedArray(zeros{})\n".format(
+                        cache_name, cache_shape_st
+                    )
+                else:
+                    self._cache_and_const_string += "{} = zeros{}\n".format(
+                        cache_name, cache_shape_st
+                    )
                 self._cache_dict[symbol.output] = cache_name
             elif self._cache_type == "dual":
                 if cache_shape[1] == 1:
                     cache_shape_st = "({})".format(cache_shape[0])
                 else:
                     cache_shape_st = cache_shape
-                self._cache_and_const_string += (
-                    "{}_init = dualcache(zeros{},12)\n".format(
-                        cache_name, cache_shape_st
+                if self._parallel == "Distributed-Shared":
+                    raise NotImplementedError("distributed dual is not yet implemented")
+                    self._cache_and_const_string += (
+                        "{}_init = dualcache(zeros{},12)\n".format(
+                            cache_name, cache_shape_st
+                        )
                     )
-                )
+                else:
+                    self._cache_and_const_string += (
+                        "{}_init = dualcache(zeros{},12)\n".format(
+                            cache_name, cache_shape_st
+                        )
+                    )
                 self._cache_initialization_string += (
                     "{} = PreallocationTools.get_tmp({}_init, y)\n".format(
                         cache_name, cache_name, cache_shape[0]
@@ -553,11 +566,7 @@ class JuliaConverter(object):
                 self._function_string += "end\n"
         elif self._parallel == "legacy-serial":
             pass
-        elif self._parallel == "Distributed-Spawn":
-            if self._cache_type != "SharedArray":
-                raise AssertionError(
-                    "for distributed to work, caches must be shared arrays"
-                )
+        elif self._parallel == "Distributed-Shared":
             ts.prepare()
             while ts.is_active():
                 self._function_string += "@sync begin\n"
