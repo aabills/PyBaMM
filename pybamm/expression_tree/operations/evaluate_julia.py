@@ -323,6 +323,14 @@ class JuliaConverter(object):
             self._intermediate[my_id] = JuliaNegation(
                 my_jl_name, this_input, my_id, my_shape
             )
+        elif isinstance(symbol, pybamm.AbsoluteValue):
+            my_jl_name = "abs"
+            my_shape = symbol.children[0].shape
+            this_input = self._convert_tree_to_intermediate(symbol.children[0])
+            my_id = symbol.id
+            self._intermediate[my_id] = JuliaBroadcastableFunction(
+                my_jl_name, this_input, my_id, my_shape
+            )
         elif isinstance(symbol, pybamm.Matrix):
             my_id = symbol.id
             value = symbol.evaluate()
