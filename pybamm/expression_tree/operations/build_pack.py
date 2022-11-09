@@ -39,7 +39,17 @@ class offsetter(object):
                 self._sv_done += [symbol.id]
 
         elif isinstance(symbol, pybamm.StateVectorDot):
-            raise NotImplementedError("Idk what this means")
+            # need to make sure its in place
+            if symbol.id not in self._sv_done:
+                for this_slice in symbol.y_slices:
+                    start = this_slice.start + self.offset
+                    stop = this_slice.stop + self.offset
+                    step = this_slice.step
+                    new_slice = slice(start, stop, step)
+                    new_y_slices += (new_slice,)
+                symbol.replace_y_slices(*new_y_slices)
+                symbol.set_id()
+                self._sv_done += [symbol.id]
         else:
             for child in symbol.children:
                 self.add_offset_to_state_vectors(child)
@@ -56,12 +66,15 @@ class Pack(object):
         functional=False,
         thermal=False,
         build_jac=False,
+        implicit=False
     ):
         # this is going to be a work in progress for a while:
         # for now, will just do it at the julia level
 
         # Build the cell expression tree with necessary parameters.
         # think about moving this to a separate function.
+
+        self._implicit = implicit
 
         self.functional = functional
         self.build_jac = build_jac
@@ -88,31 +101,50 @@ class Pack(object):
         #
         sim = pybamm.Simulation(model, parameter_values=parameter_values)
         sim.build()
-        self.cell_model = pybamm.numpy_concatenation(
-            sim.built_model.concatenated_rhs, sim.built_model.concatenated_algebraic
-        )
+        self.len_cell_rhs = sim.built_model.len_rhs
+        
+        if self._implicit:
+            self.cell_model = pybamm.numpy_concatenation(
+                (pybamm.StateVectorDot(slice(0,self.len_cell_rhs)) - sim.built_model.concatenated_rhs), sim.built_model.concatenated_algebraic
+            )
+        else:
+            self.cell_model = pybamm.numpy_concatenation(
+                sim.built_model.concatenated_rhs, sim.built_model.concatenated_algebraic
+            )
 
         self.timescale = sim.built_model.timescale
 
-        self.len_cell_rhs = sim.built_model.len_rhs
         self.len_cell_algebraic = sim.built_model.len_alg
 
         self.cell_size = self.cell_model.shape[0]
 
         if self.functional:
             sv = pybamm.StateVector(slice(0, self.cell_size))
-            if self._thermal:
-                self.cell_model = pybamm.PybammJuliaFunction(
-                    [sv, cell_current, ambient_temperature],
-                    self.cell_model,
-                    "cell!",
-                    True,
-                )
+            dsv = pybamm.StateVectorDot(slice(0,self.len_cell_rhs))
+            if self._implicit:
+                if self._thermal:
+                    self.cell_model = pybamm.PybammJuliaFunction(
+                        [sv, cell_current, ambient_temperature, dsv],
+                        self.cell_model,
+                        "cell!",
+                        True,
+                    )
+                else:
+                    self.cell_model = pybamm.PybammJuliaFunction(
+                        [sv, cell_current, dsv], self.cell_model, "cell!", True
+                    )
             else:
-                self.cell_model = pybamm.PybammJuliaFunction(
-                    [sv, cell_current], self.cell_model, "cell!", True
-                )
-
+                if self._thermal:
+                    self.cell_model = pybamm.PybammJuliaFunction(
+                        [sv, cell_current, ambient_temperature],
+                        self.cell_model,
+                        "cell!",
+                        True,
+                    )
+                else:
+                    self.cell_model = pybamm.PybammJuliaFunction(
+                        [sv, cell_current], self.cell_model, "cell!", True
+                    )
         self._sv_done = []
         self.built_model = sim.built_model
 
@@ -283,14 +315,26 @@ class Pack(object):
         # copy the basis which we can use to place the loop currents
         basis_to_place = deepcopy(mcb)
         self.place_currents(loop_currents, basis_to_place)
-        pack_eqs = self.build_pack_equations(loop_currents, curr_sources)
-        self.len_pack_eqs = len(pack_eqs)
-        pack_eqs = pybamm.numpy_concatenation(*pack_eqs)
+        pack_eqs_vec = self.build_pack_equations(loop_currents, curr_sources)
+        self.len_pack_eqs = len(pack_eqs_vec)
+        pack_eqs = pybamm.numpy_concatenation(*pack_eqs_vec)
 
         cells = [d["cell"] for d in self.batteries.values()]
         cell_eqs = pybamm.numpy_concatenation(*cells)
 
+
+
+
         self.pack = pybamm.numpy_concatenation(pack_eqs, cell_eqs)
+        if self._implicit:
+            len_sv = len(cells)*self.cell_size + len(pack_eqs_vec)
+            sv = pybamm.StateVector(slice(0,len_sv))
+            dsv = pybamm.StateVectorDot(slice(0,len_sv))
+            p = pybamm.PsuedoInputParameter("lolol")
+            t = pybamm.Time()
+            self.pack = pybamm.PybammJuliaFunction(
+                [dsv, sv, p, t], self.pack, "pack", True
+            )
         self.ics = self.initialize_pack(num_loops, len(curr_sources))
 
     def initialize_pack(self, num_loops, num_curr_sources):
@@ -444,7 +488,7 @@ class Pack(object):
                 
 
                 my_neighbors = set(
-                    self.circuit_graph.neighbors(this_node)
+                    neighbors
                 ).intersection(set(loop))
                 # if there are no neighbors in the group that have not been done, ur done!
                 my_neighbors = my_neighbors - done_nodes

@@ -386,7 +386,7 @@ class JuliaConverter(object):
             first_point = symbol.first_point
             last_point = symbol.last_point
             points = (first_point, last_point)
-            shape = symbol.shape
+            shape = (symbol.last_point - symbol.first_point,1)
             self._intermediate[my_id] = JuliaStateVectorDot(my_id, points, shape)
         else:
             raise NotImplementedError(
@@ -459,9 +459,8 @@ class JuliaConverter(object):
                 else:
                     cache_shape_st = cache_shape
                 if self._parallel == "Distributed-Shared":
-                    raise NotImplementedError("distributed dual is not yet implemented")
                     self._cache_and_const_string += (
-                        "{}_init = dualcache(zeros{},12)\n".format(
+                        "{}_init = dualcache(SharedArray(zeros{}),12)\n".format(
                             cache_name, cache_shape_st
                         )
                     )
