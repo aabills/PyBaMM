@@ -347,6 +347,15 @@ class JuliaConverter(object):
                 self._intermediate[my_id] = JuliaScalar(my_id, value)
             else:
                 self._intermediate[my_id] = JuliaConstant(my_id, value)
+        elif isinstance(symbol, pybamm.Array):
+            my_id = symbol.id
+            value = symbol.evaluate()
+            if value.shape == (1, 1):
+                if isinstance(value, scipy.sparse._csr.csr_matrix):
+                    value = value.toarray()
+                self._intermediate[my_id] = JuliaScalar(my_id, value)
+            else:
+                self._intermediate[my_id] = JuliaConstant(my_id, value)
         elif isinstance(symbol, pybamm.Scalar):
             my_id = symbol.id
             value = symbol.evaluate()
