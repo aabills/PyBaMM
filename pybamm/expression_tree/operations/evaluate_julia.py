@@ -74,6 +74,7 @@ class JuliaConverter(object):
         parallel="legacy-serial",
         inplace=True,
         black_box=False,
+        override_psuedo=False,
     ):
         # if len(outputs) != 1:
         #    raise NotImplementedError("Julia black box can only have 1 output")
@@ -94,6 +95,7 @@ class JuliaConverter(object):
             )
 
         # Characteristics
+        self._override_psuedo = override_psuedo
         self._cache_type = cache_type
         self._ismtk = ismtk
         self._jacobian_type = jacobian_type
@@ -364,7 +366,7 @@ class JuliaConverter(object):
             my_id = symbol.id
             self._intermediate[my_id] = JuliaTime(my_id)
         elif isinstance(symbol, pybamm.PsuedoInputParameter):
-            if self._black_box:
+            if self._black_box and not self._override_psuedo:
                 my_id = symbol.id
                 name = symbol.name
                 self._intermediate[my_id] = JuliaInput(my_id, name)
