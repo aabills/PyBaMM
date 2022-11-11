@@ -66,7 +66,7 @@ class Pack(object):
         functional=False,
         thermal=False,
         build_jac=False,
-        implicit=False
+        implicit=False,
     ):
         # this is going to be a work in progress for a while:
         # for now, will just do it at the julia level
@@ -80,9 +80,8 @@ class Pack(object):
         self.build_jac = build_jac
         self._thermal = thermal
 
-        if parameter_values is not None:
-            raise AssertionError("parameter values not supported")
-        parameter_values = model.default_parameter_values
+        if parameter_values is None:
+            parameter_values = model.default_parameter_values
 
         cell_current = pybamm.PsuedoInputParameter("cell_current")
         self.cell_current = cell_current
