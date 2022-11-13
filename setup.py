@@ -197,8 +197,6 @@ setup(
         "scikit-fem>=0.2.0",
         "casadi>=3.5.0",
         "imageio>=2.9.0",
-        # Julia pip packaged can be installed even if
-        # julia programming language is not installed
         "jupyter",  # For example notebooks
         "pybtex>=0.24.0",
         "sympy>=1.8",
@@ -207,8 +205,6 @@ setup(
         # outside of plot() methods.
         # Should not be imported
         "matplotlib>=2.0",
-        "juliacall>=0.1.0",
-        "juliapkg>=0.1.9",
         "graphlib-backport; python_version<'3.9'",
     ],
     extras_require={
