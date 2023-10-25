@@ -363,7 +363,7 @@ class Simulation:
         self._parameter_values.process_geometry(self._geometry)
         self._model = self._model_with_set_params
 
-    def set_initial_soc(self, initial_soc):
+    def set_initial_soc(self, initial_soc, inputs={}):
         if self._built_initial_soc != initial_soc:
             # reset
             self._model_with_set_params = None
@@ -382,7 +382,7 @@ class Simulation:
         elif options["working electrode"] == "positive":
             self._parameter_values = (
                 self._unprocessed_parameter_values.set_initial_stoichiometry_half_cell(
-                    initial_soc, param=param, inplace=False, options=options
+                    initial_soc, param=param, inplace=False, options=options, inputs=inputs
                 )
             )
         else:
@@ -395,7 +395,7 @@ class Simulation:
         # Save solved initial SOC in case we need to re-build the model
         self._built_initial_soc = initial_soc
 
-    def build(self, check_model=True, initial_soc=None):
+    def build(self, check_model=True, initial_soc=None, inputs={}):
         """
         A method to build the model into a system of matrices and vectors suitable for
         performing numerical computations. If the model has already been built or
@@ -414,7 +414,7 @@ class Simulation:
             set.
         """
         if initial_soc is not None:
-            self.set_initial_soc(initial_soc)
+            self.set_initial_soc(initial_soc, inputs=inputs)
 
         if self.built_model:
             return
@@ -431,13 +431,13 @@ class Simulation:
             # rebuilt model so clear solver setup
             self._solver._model_set_up = {}
 
-    def build_for_experiment(self, check_model=True, initial_soc=None):
+    def build_for_experiment(self, check_model=True, initial_soc=None, inputs={}):
         """
         Similar to :meth:`Simulation.build`, but for the case of simulating an
         experiment, where there may be several models and solvers to build.
         """
         if initial_soc is not None:
-            self.set_initial_soc(initial_soc)
+            self.set_initial_soc(initial_soc, inputs=inputs)
 
         if self.op_conds_to_built_models:
             return
@@ -540,7 +540,11 @@ class Simulation:
         logs = {}
 
         if self.operating_mode in ["without experiment", "drive cycle"]:
-            self.build(check_model=check_model, initial_soc=initial_soc)
+            if kwargs.get("inputs") is None:
+                build_inputs = {}
+            else:
+                build_inputs = kwargs.get("inputs")
+            self.build(check_model=check_model, initial_soc=initial_soc, inputs=build_inputs)
             if save_at_cycles is not None:
                 raise ValueError(
                     "'save_at_cycles' option can only be used if simulating an "

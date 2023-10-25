@@ -278,6 +278,7 @@ class ParameterValues:
         known_value="cyclable lithium capacity",
         inplace=True,
         options=None,
+        inputs={}
     ):
         """
         Set the initial stoichiometry of the working electrode, based on the initial
@@ -285,7 +286,7 @@ class ParameterValues:
         """
         param = param or pybamm.LithiumIonParameters(options)
         x = pybamm.lithium_ion.get_initial_stoichiometry_half_cell(
-            initial_value, self, param=param, known_value=known_value, options=options
+            initial_value, self, param=param, known_value=known_value, options=options, user_inputs=inputs
         )
         if inplace:
             parameter_values = self

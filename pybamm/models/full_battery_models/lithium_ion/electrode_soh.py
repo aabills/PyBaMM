@@ -743,7 +743,7 @@ class ElectrodeSOHSolver:
 
         return x, y
 
-    def get_min_max_stoichiometries(self):
+    def get_min_max_stoichiometries(self, user_inputs = {}):
         """
         Calculate min/max stoichiometries
         given voltage limits, open-circuit potentials, etc defined by parameter_values
@@ -766,6 +766,7 @@ class ElectrodeSOHSolver:
             Q = parameter_values.evaluate(param.Q / param.n_electrodes_parallel)
             inputs = {"Q_n": Q_n, "Q_p": Q_p, "Q": Q}
         # Solve the model and check outputs
+        inputs.update(user_inputs)
         sol = self.solve(inputs)
         return [sol["x_0"], sol["x_100"], sol["y_100"], sol["y_0"]]
 
@@ -871,7 +872,7 @@ def get_initial_stoichiometries(
 
 
 def get_min_max_stoichiometries(
-    parameter_values, param=None, known_value="cyclable lithium capacity", options=None
+    parameter_values, param=None, known_value="cyclable lithium capacity", options=None, user_inputs={}
 ):
     """
     Calculate min/max stoichiometries
@@ -898,7 +899,7 @@ def get_min_max_stoichiometries(
         The min/max stoichiometries
     """
     esoh_solver = ElectrodeSOHSolver(parameter_values, param, known_value, options)
-    return esoh_solver.get_min_max_stoichiometries()
+    return esoh_solver.get_min_max_stoichiometries(user_inputs=user_inputs)
 
 
 def get_initial_ocps(
