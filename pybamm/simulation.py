@@ -619,7 +619,7 @@ class Simulation:
 
         elif self.operating_mode == "with experiment":
             callbacks.on_experiment_start(logs)
-            self.build_for_experiment(check_model=check_model, initial_soc=initial_soc)
+            self.build_for_experiment(check_model=check_model, initial_soc=initial_soc, inputs=build_inputs)
             if t_eval is not None:
                 pybamm.logger.warning(
                     "Ignoring t_eval as solution times are specified by the experiment"
