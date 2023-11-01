@@ -538,12 +538,11 @@ class Simulation:
 
         callbacks = pybamm.callbacks.setup_callbacks(callbacks)
         logs = {}
-
+        if kwargs.get("inputs") is None:
+            build_inputs = {}
+        else:
+            build_inputs = kwargs.get("inputs")
         if self.operating_mode in ["without experiment", "drive cycle"]:
-            if kwargs.get("inputs") is None:
-                build_inputs = {}
-            else:
-                build_inputs = kwargs.get("inputs")
             self.build(check_model=check_model, initial_soc=initial_soc, inputs=build_inputs)
             if save_at_cycles is not None:
                 raise ValueError(
