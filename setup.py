@@ -242,10 +242,7 @@ setup(
         ],
         "latexify": [
             "sympy>=1.8",
-        ],
-        "bpx": [
-            "bpx",
-        ],
+        ]
         "tqdm": [
             "tqdm",
         ],
@@ -277,7 +274,6 @@ setup(
             "imageio>=2.9.0",
             "pybtex>=0.24.0",
             "sympy>=1.8",
-            "bpx",
             "tqdm",
             "matplotlib>=2.0",
             "jupyter",
