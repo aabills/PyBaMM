@@ -242,7 +242,7 @@ setup(
         ],
         "latexify": [
             "sympy>=1.8",
-        ]
+        ],
         "tqdm": [
             "tqdm",
         ],
