@@ -355,13 +355,21 @@ class Simulation:
         elif options["working electrode"] == "positive":
             self._parameter_values = (
                 self._unprocessed_parameter_values.set_initial_stoichiometry_half_cell(
-                    initial_soc, param=param, inplace=False, options=options, inputs=inputs
+                    initial_soc,
+                    param=param,
+                    inplace=False,
+                    options=options,
+                    inputs=inputs,
                 )
             )
         else:
             self._parameter_values = (
                 self._unprocessed_parameter_values.set_initial_stoichiometries(
-                    initial_soc, param=param, inplace=False, options=options, inputs=inputs
+                    initial_soc,
+                    param=param,
+                    inplace=False,
+                    options=options,
+                    inputs=inputs,
                 )
             )
 
@@ -587,7 +595,9 @@ class Simulation:
                             stacklevel=2,
                         )
 
-            self._solution = solver.solve(self.built_model, t_eval, inputs=inputs, **kwargs)
+            self._solution = solver.solve(
+                self.built_model, t_eval, inputs=inputs, **kwargs
+            )
 
         elif self.operating_mode == "with experiment":
             callbacks.on_experiment_start(logs)
@@ -602,7 +612,6 @@ class Simulation:
             # inputs without having to build the simulation again
             self._solution = starting_solution
             # Step through all experimental conditions
-            user_inputs = inputs
             timer = pybamm.Timer()
 
             # Set up eSOH solver (for summary variables)
@@ -621,6 +630,7 @@ class Simulation:
                     [starting_solution],
                     esoh_solver=esoh_solver,
                     save_this_cycle=True,
+                    inputs=inputs,
                 )
                 starting_solution_cycles = [cycle_solution]
                 starting_solution_summary_variables = [cycle_sum_vars]
@@ -678,13 +688,14 @@ class Simulation:
                         # logs["step operating conditions"] = "Initial rest for padding"
                         # callbacks.on_step_start(logs)
 
-                        inputs = {
-                            **user_inputs,
-                            "Ambient temperature [K]": (
-                                op_conds.temperature or self._original_temperature
-                            ),
-                            "start time": current_solution.t[-1],
-                        }
+                        inputs.update(
+                            {
+                                "Ambient temperature [K]": (
+                                    op_conds.temperature or self._original_temperature
+                                ),
+                                "start time": current_solution.t[-1],
+                            }
+                        )
                         steps = current_solution.cycles[-1].steps
                         step_solution = current_solution.cycles[-1].steps[-1]
 
@@ -694,7 +705,10 @@ class Simulation:
                         steps[-1] = step_solution + step_solution_with_rest
 
                         cycle_solution, _, _ = pybamm.make_cycle_solution(
-                            steps, esoh_solver=esoh_solver, save_this_cycle=True
+                            steps,
+                            esoh_solver=esoh_solver,
+                            save_this_cycle=True,
+                            inputs=inputs,
                         )
                         old_cycles = current_solution.cycles.copy()
                         old_cycles[-1] = cycle_solution
@@ -782,11 +796,7 @@ class Simulation:
                     logs["step number"] = (step_num, cycle_length)
                     logs["step operating conditions"] = op_conds_str
                     callbacks.on_step_start(logs)
-
-                    inputs = {
-                        **user_inputs,
-                        "start time": start_time,
-                    }
+                    inputs.update({"start time": start_time})
                     # Make sure we take at least 2 timesteps
                     npts = max(int(round(dt / op_conds.period)) + 1, 2)
                     try:
@@ -832,15 +842,15 @@ class Simulation:
                             logs["step number"] = (step_num, cycle_length)
                             logs["step operating conditions"] = "Rest for padding"
                             callbacks.on_step_start(logs)
-
-                            inputs = {
-                                **user_inputs,
-                                "Ambient temperature [K]": (
-                                    op_conds.temperature or self._original_temperature
-                                ),
-                                "start time": step_solution.t[-1],
-                            }
-
+                            inputs.update(
+                                {
+                                    "Ambient temperature [K]": (
+                                        op_conds.temperature
+                                        or self._original_temperature
+                                    ),
+                                    "start time": step_solution.t[-1],
+                                }
+                            )
                             step_solution_with_rest = self.run_padding_rest(
                                 kwargs, rest_time, step_solution, inputs=inputs
                             )
@@ -908,7 +918,10 @@ class Simulation:
                                 "due to exceeded bounds at initial conditions."
                             )
                     cycle_sol = pybamm.make_cycle_solution(
-                        steps, esoh_solver=esoh_solver, save_this_cycle=save_this_cycle
+                        steps,
+                        esoh_solver=esoh_solver,
+                        save_this_cycle=save_this_cycle,
+                        inputs=inputs,
                     )
                     cycle_solution, cycle_sum_vars, cycle_first_state = cycle_sol
                     all_cycle_solutions.append(cycle_solution)

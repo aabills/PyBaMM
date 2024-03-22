@@ -292,7 +292,7 @@ class ParameterValues:
         known_value="cyclable lithium capacity",
         inplace=True,
         options=None,
-        inputs=None
+        inputs=None,
     ):
         """
         Set the initial stoichiometry of the working electrode, based on the initial
@@ -300,7 +300,12 @@ class ParameterValues:
         """
         param = param or pybamm.LithiumIonParameters(options)
         x = pybamm.lithium_ion.get_initial_stoichiometry_half_cell(
-            initial_value, self, param=param, known_value=known_value, options=options, inputs=inputs
+            initial_value,
+            self,
+            param=param,
+            known_value=known_value,
+            options=options,
+            inputs=inputs,
         )
         if inplace:
             parameter_values = self
@@ -333,6 +338,7 @@ class ParameterValues:
         SOC or voltage
         """
         param = param or pybamm.LithiumIonParameters(options)
+        inputs = inputs or {}
         x, y = pybamm.lithium_ion.get_initial_stoichiometries(
             initial_value,
             self,
@@ -340,6 +346,7 @@ class ParameterValues:
             known_value=known_value,
             options=options,
             tol=tol,
+            inputs=inputs,
         )
         if inplace:
             parameter_values = self
@@ -771,7 +778,7 @@ class ParameterValues:
             # Backup option: return the object
             return symbol
 
-    def evaluate(self, symbol):
+    def evaluate(self, symbol, inputs=None):
         """
         Process and evaluate a symbol.
 
@@ -785,11 +792,18 @@ class ParameterValues:
         number or array
             The evaluated symbol
         """
+        inputs = inputs or {}
         processed_symbol = self.process_symbol(symbol)
         if processed_symbol.is_constant():
             return processed_symbol.evaluate()
         else:
-            raise ValueError("symbol must evaluate to a constant scalar or array")
+            # Try to evaluate it with inputs:
+            try:
+                return processed_symbol.evaluate(inputs=inputs)
+            except Exception as exc:
+                raise ValueError(
+                    "symbol must evaluate to a constant scalar or array"
+                ) from exc
 
     def _ipython_key_completions_(self):
         return list(self._dict_items.keys())
