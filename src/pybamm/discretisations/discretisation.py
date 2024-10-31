@@ -929,7 +929,10 @@ class Discretisation:
             new_children = [self.process_symbol(child) for child in symbol.children]
             new_symbol = spatial_method.concatenation(new_children)
             return new_symbol
-
+        
+        elif isinstance(symbol, pybamm.CoupledVariable):
+            new_symbol = self.process_symbol(symbol.children[0])
+            return new_symbol
         elif isinstance(symbol, pybamm.InputParameter):
             if symbol.domain != []:
                 expected_size = self._get_variable_size(symbol)
