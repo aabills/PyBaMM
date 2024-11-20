@@ -157,7 +157,10 @@ class BaseElectrode(pybamm.BaseSubModel):
         if "negative electrode" not in self.options.whole_cell_domains:
             i_s_n = None
         else:
-            i_s_n = variables["Negative electrode current density [A.m-2]"]
+            i_s_n = pybamm.CoupledVariable(
+                "Negative electrode current density [A.m-2]",
+                domain="negative electrode",
+            )
         i_s_s = pybamm.FullBroadcast(0, ["separator"], "current collector")
         i_s_p = variables["Positive electrode current density [A.m-2]"]
 
